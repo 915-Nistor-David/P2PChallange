@@ -90,3 +90,41 @@ void start_udp_server(int port) {
 
     close(server_socket);
 }
+
+
+
+// Functia pentru cererea metadatelor fisierului
+void request_file_metadata(const char *peer_ip, int peer_port, const char *file_name) {
+    int client_socket;
+    struct sockaddr_in server_addr;
+
+    // Creare socket UDP
+    client_socket = socket(AF_INET, SOCK_DGRAM, 0);
+    if (client_socket == -1) {
+        perror("Eroare la crearea socket-ului");
+        return;
+    }
+
+    // Configurare adresa server
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(peer_port);
+    inet_pton(AF_INET, peer_ip, &server_addr.sin_addr);
+
+    // Trimite cerere pentru metadate
+    char request[BUFFER_SIZE];
+    snprintf(request, sizeof(request), "METADATA_REQ %s", file_name);
+    sendto(client_socket, request, strlen(request), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+
+    // Primeste raspunsul
+    char response[BUFFER_SIZE];
+    recvfrom(client_socket, response, sizeof(response), 0, NULL, NULL);
+    if (strncmp(response, "METADATA_RES", 12) == 0) {
+        uint64_t chunk_count;
+        recvfrom(client_socket, &chunk_count, sizeof(chunk_count), 0, NULL, NULL);
+        printf("Fișierul %s are %lu chunks.\n", file_name, chunk_count);
+    } else if (strncmp(response, "NO_FILE", 7) == 0) {
+        printf("Fișierul %s nu este disponibil.\n", file_name);
+    }
+
+    close(client_socket);
+}
