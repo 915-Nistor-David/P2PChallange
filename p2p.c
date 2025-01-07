@@ -98,3 +98,53 @@ void start_tcp_server(int port) {
 
     close(server_socket);
 }
+
+
+
+// Funcția client pentru `PEER_DISCOVERY`
+void peer_discovery_request(const char *peer_ip, int peer_port) {
+    int client_socket;
+    struct sockaddr_in server_addr;
+
+    // Creare socket
+    client_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (client_socket == -1) {
+        perror("Eroare la crearea socket-ului");
+        return;
+    }
+
+    // Configurare adresă server
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(peer_port);
+    inet_pton(AF_INET, peer_ip, &server_addr.sin_addr);
+
+    // Conectare la server
+    if (connect(client_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
+        perror("Eroare la conectare");
+        close(client_socket);
+        return;
+    }
+
+    // Trimite cerere `PEER_DISCOVERY`
+    send(client_socket, "PEER_DISCOVERY", 14, 0);
+
+    // Primește lista de peers
+    char response[BUFFER_SIZE];
+    recv(client_socket, response, sizeof(response), 0);
+    if (strncmp(response, "PEER_LIST", 9) == 0) {
+        uint64_t vector_size;
+        recv(client_socket, &vector_size, sizeof(vector_size), 0);
+
+        printf("Am primit %lu peers:\n", vector_size);
+        for (uint64_t i = 0; i < vector_size; i++) {
+            PeerInfo peer;
+            recv(client_socket, &peer, sizeof(PeerInfo), 0);
+
+            struct in_addr ip_addr;
+            ip_addr.s_addr = peer.ip;
+            printf("Peer %lu: %s:%d\n", i + 1, inet_ntoa(ip_addr), ntohs(peer.port));
+        }
+    }
+
+    close(client_socket);
+}
