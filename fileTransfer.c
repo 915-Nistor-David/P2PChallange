@@ -171,3 +171,28 @@ void request_file_chunks(const char *peer_ip, int peer_port, const char *file_na
     fclose(file);
     close(client_socket);
 }
+
+
+int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        fprintf(stderr, "Utilizare: %s server <port> sau %s client <ip> <port> <file_name>\n", argv[0], argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    if (strcmp(argv[1], "server") == 0) {
+        int port = atoi(argv[2]);
+        start_udp_server(port);
+    } else if (strcmp(argv[1], "client") == 0) {
+        const char *peer_ip = argv[2];
+        int peer_port = atoi(argv[3]);
+        const char *file_name = argv[4];
+
+        request_file_metadata(peer_ip, peer_port, file_name);
+        request_file_chunks(peer_ip, peer_port, file_name, 10); // Exemplu cu 10 chunks
+    } else {
+        fprintf(stderr, "Comanda necunoscuta: %s\n", argv[1]);
+        return EXIT_FAILURE;
+    }
+
+    return 0;
+}
