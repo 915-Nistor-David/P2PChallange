@@ -16,3 +16,77 @@ typedef struct {
     uint64_t chunk_number;
     uint8_t data[CHUNK_SIZE];
 } ChunkResponse;
+
+
+// Functia pentru pornirea serverului UDP
+void start_udp_server(int port) {
+    int server_socket;
+    struct sockaddr_in server_addr, client_addr;
+    socklen_t client_len = sizeof(client_addr);
+
+    // Creare socket UDP
+    server_socket = socket(AF_INET, SOCK_DGRAM, 0);
+    if (server_socket == -1) {
+        perror("Eroare la crearea socket-ului");
+        exit(EXIT_FAILURE);
+    }
+
+    // Configurare adresa server
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(port);
+
+    if (bind(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
+        perror("Eroare la bind");
+        close(server_socket);
+        exit(EXIT_FAILURE);
+    }
+
+    printf("UDP Server pornit pe portul %d...\n", port);
+
+    // Asteptare cereri
+    while (1) {
+        char buffer[BUFFER_SIZE];
+        recvfrom(server_socket, buffer, sizeof(buffer), 0, (struct sockaddr *)&client_addr, &client_len);
+
+        if (strncmp(buffer, "METADATA_REQ", 12) == 0) {
+            // Trimite metadatele fisierului
+            char file_name[256];
+            sscanf(buffer + 13, "%s", file_name);
+
+            FILE *file = fopen(file_name, "rb");
+            if (!file) {
+                sendto(server_socket, "NO_FILE", 7, 0, (struct sockaddr *)&client_addr, client_len);
+                continue;
+            }
+
+            // Calculam numarul de chunks
+            fseek(file, 0, SEEK_END);
+            uint64_t file_size = ftell(file);
+            uint64_t chunk_count = (file_size + CHUNK_SIZE - 1) / CHUNK_SIZE;
+            fclose(file);
+
+            sendto(server_socket, "METADATA_RES", 12, 0, (struct sockaddr *)&client_addr, client_len);
+            sendto(server_socket, &chunk_count, sizeof(chunk_count), 0, (struct sockaddr *)&client_addr, client_len);
+        } else if (strncmp(buffer, "CHUNK_REQ", 9) == 0) {
+            // Trimite chunk-ul cerut
+            ChunkRequest req;
+            memcpy(&req, buffer + 9, sizeof(req));
+
+            FILE *file = fopen(req.file_name, "rb");
+            if (!file) {
+                continue;
+            }
+
+            fseek(file, req.chunk_number * CHUNK_SIZE, SEEK_SET);
+            ChunkResponse res;
+            res.chunk_number = req.chunk_number;
+            fread(res.data, 1, CHUNK_SIZE, file);
+            fclose(file);
+
+            sendto(server_socket, &res, sizeof(res), 0, (struct sockaddr *)&client_addr, client_len);
+        }
+    }
+
+    close(server_socket);
+}
