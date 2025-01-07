@@ -128,3 +128,46 @@ void request_file_metadata(const char *peer_ip, int peer_port, const char *file_
 
     close(client_socket);
 }
+
+
+
+// Functia pentru descarcarea fisierului
+void request_file_chunks(const char *peer_ip, int peer_port, const char *file_name, uint64_t chunk_count) {
+    int client_socket;
+    struct sockaddr_in server_addr;
+
+    // Creare socket UDP
+    client_socket = socket(AF_INET, SOCK_DGRAM, 0);
+    if (client_socket == -1) {
+        perror("Eroare la crearea socket-ului");
+        return;
+    }
+
+    // Configurare adresa server
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(peer_port);
+    inet_pton(AF_INET, peer_ip, &server_addr.sin_addr);
+
+    // Descarcare chunks
+    FILE *file = fopen(file_name, "wb");
+    if (!file) {
+        perror("Eroare la deschiderea fișierului");
+        close(client_socket);
+        return;
+    }
+
+    for (uint64_t i = 0; i < chunk_count; i++) {
+        char request[BUFFER_SIZE];
+        snprintf(request, sizeof(request), "CHUNK_REQ %s %lu", file_name, i);
+        sendto(client_socket, request, strlen(request), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+
+        ChunkResponse res;
+        recvfrom(client_socket, &res, sizeof(res), 0, NULL, NULL);
+
+        fwrite(res.data, 1, CHUNK_SIZE, file);
+        printf("Chunk %lu descărcat.\n", i);
+    }
+
+    fclose(file);
+    close(client_socket);
+}
