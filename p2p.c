@@ -101,7 +101,7 @@ void start_tcp_server(int port) {
 
 
 
-// Funcția client pentru `PEER_DISCOVERY`
+// Functia client pentru `PEER_DISCOVERY`
 void peer_discovery_request(const char *peer_ip, int peer_port) {
     int client_socket;
     struct sockaddr_in server_addr;
@@ -113,7 +113,7 @@ void peer_discovery_request(const char *peer_ip, int peer_port) {
         return;
     }
 
-    // Configurare adresă server
+    // Configurare adresa server
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(peer_port);
     inet_pton(AF_INET, peer_ip, &server_addr.sin_addr);
@@ -128,7 +128,7 @@ void peer_discovery_request(const char *peer_ip, int peer_port) {
     // Trimite cerere `PEER_DISCOVERY`
     send(client_socket, "PEER_DISCOVERY", 14, 0);
 
-    // Primește lista de peers
+    // Primeste lista de peers
     char response[BUFFER_SIZE];
     recv(client_socket, response, sizeof(response), 0);
     if (strncmp(response, "PEER_LIST", 9) == 0) {
@@ -147,4 +147,28 @@ void peer_discovery_request(const char *peer_ip, int peer_port) {
     }
 
     close(client_socket);
+}
+
+
+
+int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        fprintf(stderr, "Utilizare: %s server <port> sau %s client <ip> <port>\n", argv[0], argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    if (strcmp(argv[1], "server") == 0) {
+        int port = atoi(argv[2]);
+        add_peer("127.0.0.1", port); // Adauga peer-ul local pentru testare
+        start_tcp_server(port);
+    } else if (strcmp(argv[1], "client") == 0) {
+        const char *peer_ip = argv[2];
+        int peer_port = atoi(argv[3]);
+        peer_discovery_request(peer_ip, peer_port);
+    } else {
+        fprintf(stderr, "Comanda necunoscuta: %s\n", argv[1]);
+        return EXIT_FAILURE;
+    }
+
+    return 0;
 }
